@@ -47,11 +47,14 @@ server.post("/participants", async (req, res) => {
     const notAvailableName = await usersCollection.findOne({
       name: participant.name,
     });
+
     if (notAvailableName) {
       res.sendStatus(409);
       return;
     }
+
     await usersCollection.insertOne({ ...participant, lastStatus: Date.now() });
+
     const messagesCollection = db.collection("messages");
     await messagesCollection.insertOne({
       from: participant.name,
@@ -64,10 +67,22 @@ server.post("/participants", async (req, res) => {
     mongoClient.close();
   } catch (error) {
     res.status(500).send(error);
+    mongoClient.close();
   }
 });
 
-server.get("/participants", (req, res) => {});
+server.get("/participants", async (req, res) => {
+  const { mongoClient, db } = await mongoConnect();
+
+  try {
+    const participants = await db.collection("users").find({}).toArray();
+    res.send(participants);
+    mongoClient.close();
+  } catch (error) {
+    res.status(500).send(error);
+    mongoClient.close();
+  }
+});
 
 server.post("/messages", (req, res) => {});
 
