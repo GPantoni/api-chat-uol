@@ -33,10 +33,38 @@ const messageSchema = joi.object({
 });
 
 server.post("/participants", async (req, res) => {
+  const participant = req.body;
+  const validation = nameSchema.validate(participant);
+  if (validation.error) {
+    res.status(422).send(validation.error.details);
+    return;
+  }
+
   const { mongoClient, db } = await mongoConnect();
 
   try {
-  } catch (error) {}
+    const usersCollection = db.collection("users");
+    const notAvailableName = await usersCollection.findOne({
+      name: participant.name,
+    });
+    if (notAvailableName) {
+      res.sendStatus(409);
+      return;
+    }
+    await usersCollection.insertOne({ ...participant, lastStatus: Date.now() });
+    const messagesCollection = db.collection("messages");
+    await messagesCollection.insertOne({
+      from: participant.name,
+      to: "Todos",
+      text: "entra na sala...",
+      type: "status",
+      time: dayjs().format("HH:MM:SS"),
+    });
+    res.sendStatus(201);
+    mongoClient.close();
+  } catch (error) {
+    res.status(500).send(error);
+  }
 });
 
 server.get("/participants", (req, res) => {});
