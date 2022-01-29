@@ -92,6 +92,29 @@ server.delete("/messages/:id", (req, res) => {});
 
 server.put("messages/:id", (req, res) => {});
 
-server.post("/status", (req, res) => {});
+server.post("/status", async (req, res) => {
+  const { mongoClient, db } = await mongoConnect();
+
+  const { user } = req.headers;
+
+  try {
+    const isAnUser = await db.collection("users").findOne({ name: user });
+    if (!isAnUser) {
+      res.sendStatus(404);
+      mongoClient.close();
+      return;
+    }
+
+    await db
+      .collection("users")
+      .updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
+
+    res.sendStatus(200);
+    mongoClient.close();
+  } catch (error) {
+    res.status(500).send(error);
+    mongoClient.close();
+  }
+});
 
 server.listen(5000);
