@@ -22,7 +22,22 @@ async function mongoConnect() {
   }
 }
 
-server.post("/participants", (req, res) => {});
+const nameSchema = joi.object({
+  name: joi.string().required(),
+});
+
+const messageSchema = joi.object({
+  to: joi.string().required(),
+  text: joi.string().required(),
+  type: joi.alternatives().valid("message", "private_message").required(),
+});
+
+server.post("/participants", async (req, res) => {
+  const { mongoClient, db } = await mongoConnect();
+
+  try {
+  } catch (error) {}
+});
 
 server.get("/participants", (req, res) => {});
 
