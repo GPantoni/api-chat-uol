@@ -30,6 +30,7 @@ const messageSchema = joi.object({
   to: joi.string().required(),
   text: joi.string().required(),
   type: joi.alternatives().valid("message", "private_message").required(),
+  from: joi.string(),
 });
 
 server.post("/participants", async (req, res) => {
@@ -50,6 +51,7 @@ server.post("/participants", async (req, res) => {
 
     if (notAvailableName) {
       res.sendStatus(409);
+      mongoClient.close();
       return;
     }
 
@@ -84,7 +86,32 @@ server.get("/participants", async (req, res) => {
   }
 });
 
-server.post("/messages", (req, res) => {});
+server.post("/messages", async (req, res) => {
+  const { mongoClient, db } = await mongoConnect();
+
+  const from = req.headers.user;
+  const message = { ...req.body, from };
+  const validation = messageSchema.validate(message, { abortEarly: false });
+  const fromIsAnUser = await db
+    .collection("users")
+    .findOne({ name: new ObjectId(from) });
+  if (validation.error || !fromIsAnUser) {
+    res.status(422);
+    mongoClient.close();
+    return;
+  }
+
+  try {
+    message = { ...message, time: dayjs().format("HH:MM:SS") };
+    const messagesCollection = db.collection("messages");
+    await messagesCollection.insertOne({ message });
+    res.sendStatus(201);
+    mongoClient.close();
+  } catch (error) {
+    res.status(500).send(error);
+    mongoClient.close();
+  }
+});
 
 server.get("/messages", (req, res) => {});
 
