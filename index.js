@@ -40,7 +40,7 @@ server.post("/participants", async (req, res) => {
   const validation = nameSchema.validate(participant);
   if (validation.error) {
     res.status(422).send(validation.error.details);
-    mongoClient.close();
+    // mongoClient.close();
     return;
   }
 
@@ -52,7 +52,7 @@ server.post("/participants", async (req, res) => {
 
     if (notAvailableName) {
       res.sendStatus(409);
-      mongoClient.close();
+      // mongoClient.close();
       return;
     }
 
@@ -67,10 +67,10 @@ server.post("/participants", async (req, res) => {
       time: dayjs().format("hh:mm:ss"),
     });
     res.sendStatus(201);
-    mongoClient.close();
+    // mongoClient.close();
   } catch (error) {
     res.status(500).send(error);
-    mongoClient.close();
+    // mongoClient.close();
   }
 });
 
@@ -80,10 +80,10 @@ server.get("/participants", async (req, res) => {
   try {
     const participants = await db.collection("users").find({}).toArray();
     res.send(participants);
-    mongoClient.close();
+    // mongoClient.close();
   } catch (error) {
     res.status(500).send(error);
-    mongoClient.close();
+    // mongoClient.close();
   }
 });
 
@@ -92,25 +92,25 @@ server.post("/messages", async (req, res) => {
 
   const from = req.headers.user;
   const message = { ...req.body, from };
-  const validation = messageSchema.validate(message, { abortEarly: false });
-  const fromIsAnUser = await db
-    .collection("users")
-    .findOne({ name: new ObjectId(from) });
+  const validation = messageSchema.validate(message);
+  const fromIsAnUser = await db.collection("users").findOne({ name: from });
   if (validation.error || !fromIsAnUser) {
     res.sendStatus(422);
-    mongoClient.close();
+    // mongoClient.close();
     return;
   }
 
   try {
-    message = { ...message, time: dayjs().format("HH:MM:SS") };
     const messagesCollection = db.collection("messages");
-    await messagesCollection.insertOne({ message });
+    await messagesCollection.insertOne({
+      ...message,
+      time: dayjs().format("HH:MM:SS"),
+    });
     res.sendStatus(201);
-    mongoClient.close();
+    // mongoClient.close();
   } catch (error) {
     res.status(500).send(error);
-    mongoClient.close();
+    // mongoClient.close();
   }
 });
 
@@ -132,16 +132,20 @@ server.get("/messages", async (req, res) => {
     if (userMessages.length > limit) {
       const limitedUserMessages = userMessages.slice(-limit);
       res.send(limitedUserMessages);
-      mongoClient.close();
+      // mongoClient.close();
+      console.log("dentro do if");
       return;
     }
 
+    // console.log("depois do if");
+    // console.log(userMessages);
+
     res.send(userMessages);
-    mongoClient.close();
+    // mongoClient.close();
   } catch (error) {
     console.error(error);
     res.sendStatus(500);
-    mongoClient.close();
+    // mongoClient.close();
   }
 });
 
@@ -159,30 +163,31 @@ server.delete("/messages/:id", async (req, res) => {
 
     if (!messageExists) {
       res.sendStatus(404);
-      mongoClient.close();
+      // mongoClient.close();
       return;
     }
 
     if (user !== messageExists.from) {
       res.sendStatus(401);
-      mongoClient.close();
+      // mongoClient.close();
       return;
     }
 
     await db.collection("messages").deleteOne({ _id: new ObjectId(id) });
     res.sendStatus(200);
-    mongoClient.close();
+    // mongoClient.close();
   } catch (error) {
     console.error(error);
     res.status(500).send(error);
-    mongoClient.close();
+    // mongoClient.close();
   }
 });
 
-server.put("messages/:id", async (req, res) => {
+server.put("/messages/:id", async (req, res) => {
   const { mongoClient, db } = await mongoConnect();
 
   const id = req.params.id;
+  console.log(id);
   const from = req.headers.user;
   const message = { ...req.body, from };
 
@@ -202,24 +207,25 @@ server.put("messages/:id", async (req, res) => {
 
     if (!messageExists) {
       res.sendStatus(404);
-      mongoClient.close();
+      // mongoClient.close();
       return;
     }
 
     if (from !== messageExists.from) {
       res.sendStatus(401);
-      mongoClient.close();
+      // mongoClient.close();
       return;
     }
 
-    await db
+    const editedMessage = await db
       .collection("messages")
-      .updateOne({ _id: messageExists._id }, { $set: message });
+      .updateOne({ _id: messageExists._id }, { $set: { ...message } });
+    console.log(editedMessage);
     res.sendStatus(201);
-    mongoClient.close();
+    // mongoClient.close();
   } catch (error) {
     res.sendStatus(error);
-    mongoClient.close();
+    // mongoClient.close();
   }
 });
 
@@ -232,7 +238,7 @@ server.post("/status", async (req, res) => {
     const isAnUser = await db.collection("users").findOne({ name: user });
     if (!isAnUser) {
       res.sendStatus(404);
-      mongoClient.close();
+      // mongoClient.close();
       return;
     }
 
@@ -241,10 +247,10 @@ server.post("/status", async (req, res) => {
       .updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
 
     res.sendStatus(200);
-    mongoClient.close();
+    // mongoClient.close();
   } catch (error) {
     res.status(500).send(error);
-    mongoClient.close();
+    // mongoClient.close();
   }
 });
 
@@ -267,11 +273,11 @@ setInterval(async () => {
         await db.collection("users").deleteOne({ _id: p._id });
       }
 
-      mongoClient.close();
+      // mongoClient.close();
     });
   } catch (error) {
     console.error(error);
-    mongoClient.close();
+    // mongoClient.close();
   }
 }, 15000);
 
