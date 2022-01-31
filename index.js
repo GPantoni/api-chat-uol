@@ -34,14 +34,15 @@ const messageSchema = joi.object({
 });
 
 server.post("/participants", async (req, res) => {
+  const { mongoClient, db } = await mongoConnect();
+
   const participant = req.body;
   const validation = nameSchema.validate(participant);
   if (validation.error) {
     res.status(422).send(validation.error.details);
+    mongoClient.close();
     return;
   }
-
-  const { mongoClient, db } = await mongoConnect();
 
   try {
     const usersCollection = db.collection("users");
@@ -96,7 +97,7 @@ server.post("/messages", async (req, res) => {
     .collection("users")
     .findOne({ name: new ObjectId(from) });
   if (validation.error || !fromIsAnUser) {
-    res.status(422);
+    res.sendStatus(422);
     mongoClient.close();
     return;
   }
@@ -178,7 +179,49 @@ server.delete("/messages/:id", async (req, res) => {
   }
 });
 
-server.put("messages/:id", (req, res) => {});
+server.put("messages/:id", async (req, res) => {
+  const { mongoClient, db } = await mongoConnect();
+
+  const id = req.params.id;
+  const from = req.headers.user;
+  const message = { ...req.body, from };
+
+  const validation = messageSchema.validate(message);
+
+  message.time = dayjs().format("hh:mm:ss");
+
+  if (validation.error) {
+    res.sendStatus(422);
+    return;
+  }
+
+  try {
+    const messageExists = await db
+      .collection("messages")
+      .findOne({ _id: new ObjectId(id) });
+
+    if (!messageExists) {
+      res.sendStatus(404);
+      mongoClient.close();
+      return;
+    }
+
+    if (from !== messageExists.from) {
+      res.sendStatus(401);
+      mongoClient.close();
+      return;
+    }
+
+    await db
+      .collection("messages")
+      .updateOne({ _id: messageExists._id }, { $set: message });
+    res.sendStatus(201);
+    mongoClient.close();
+  } catch (error) {
+    res.sendStatus(error);
+    mongoClient.close();
+  }
+});
 
 server.post("/status", async (req, res) => {
   const { mongoClient, db } = await mongoConnect();
