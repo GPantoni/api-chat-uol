@@ -63,7 +63,7 @@ server.post("/participants", async (req, res) => {
       to: "Todos",
       text: "entra na sala...",
       type: "status",
-      time: dayjs().format("HH:MM:SS"),
+      time: dayjs().format("hh:mm:ss"),
     });
     res.sendStatus(201);
     mongoClient.close();
@@ -144,7 +144,39 @@ server.get("/messages", async (req, res) => {
   }
 });
 
-server.delete("/messages/:id", (req, res) => {});
+server.delete("/messages/:id", async (req, res) => {
+  const { mongoClient, db } = mongoConnect();
+
+  const { user } = req.headers;
+
+  const { id } = req.params;
+
+  try {
+    const messageExists = await db
+      .collection("messages")
+      .findOne({ _id: new ObjectId(id) });
+
+    if (!messageExists) {
+      res.sendStatus(404);
+      mongoClient.close();
+      return;
+    }
+
+    if (user !== messageExists.from) {
+      res.sendStatus(401);
+      mongoClient.close();
+      return;
+    }
+
+    await db.collection("messages").deleteOne({ _id: new ObjectId(id) });
+    res.sendStatus(200);
+    mongoClient.close();
+  } catch (error) {
+    console.error(error);
+    res.status(500).send(error);
+    mongoClient.close();
+  }
+});
 
 server.put("messages/:id", (req, res) => {});
 
