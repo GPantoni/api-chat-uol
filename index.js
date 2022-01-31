@@ -113,7 +113,36 @@ server.post("/messages", async (req, res) => {
   }
 });
 
-server.get("/messages", (req, res) => {});
+server.get("/messages", async (req, res) => {
+  const { mongoClient, db } = await mongoConnect();
+
+  const { user } = req.headers;
+
+  const limit = parseInt(req.query.limit);
+
+  try {
+    const userMessages = await db
+      .collection("messages")
+      .find({
+        $or: [{ to: "Todos" }, { from: user }, { to: user }],
+      })
+      .toArray();
+
+    if (userMessages.length > limit) {
+      const limitedUserMessages = userMessages.slice(-limit);
+      res.send(limitedUserMessages);
+      mongoClient.close();
+      return;
+    }
+
+    res.send(userMessages);
+    mongoClient.close();
+  } catch (error) {
+    console.error(error);
+    res.sendStatus(500);
+    mongoClient.close();
+  }
+});
 
 server.delete("/messages/:id", (req, res) => {});
 
