@@ -173,4 +173,31 @@ server.post("/status", async (req, res) => {
   }
 });
 
+setInterval(async () => {
+  const { mongoClient, db } = await mongoConnect();
+
+  const participants = await db.collection("users").find().toArray();
+
+  try {
+    participants.forEach(async (p) => {
+      if (p.lastStatus < Date.now() - 10000) {
+        await db.collection("messages").insertOne({
+          from: p.name,
+          to: "Todos",
+          text: "Sai da sala...",
+          type: "status",
+          time: dayjs(Date.now()).format("hh:mm:ss"),
+        });
+
+        await db.collection("users").deleteOne({ _id: p._id });
+      }
+
+      mongoClient.close();
+    });
+  } catch (error) {
+    console.error(error);
+    mongoClient.close();
+  }
+}, 15000);
+
 server.listen(5000);
